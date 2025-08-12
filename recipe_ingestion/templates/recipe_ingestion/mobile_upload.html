@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Recipe Upload - Plenary Pantry</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .upload-text {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .upload-hint {
+            color: #999;
+            font-size: 14px;
+        }
+        
+        #file-input {
+            display: none;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .preview img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .tips {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .tips h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .tips ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .tips li {
+            padding: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .tips li:before {
+            content: "📸 ";
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Recipe Photo Upload</h1>
+        
+        <form id="upload-form">
+            <div class="form-group">
+                <label for="user-id">User ID:</label>
+                <input type="number" id="user-id" name="user_id" value="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="source-name">Recipe Name (optional):</label>
+                <input type="text" id="source-name" name="source_name" placeholder="e.g., Grandma's Cookie Recipe">
+            </div>
+            
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📷</div>
+                <div class="upload-text">Tap to select a recipe photo</div>
+                <div class="upload-hint">or drag and drop here</div>
+                <input type="file" id="file-input" name="image" accept="image/*" required>
+            </div>
+            
+            <div class="preview" id="preview" style="display: none;">
+                <img id="preview-img" alt="Recipe preview">
+            </div>
+            
+            <button type="submit" class="btn" id="submit-btn">
+                🚀 Upload & Process Recipe
+            </button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Processing recipe with OCR...</div>
+        </div>
+        
+        <div class="result" id="result" style="display: none;"></div>
+        
+        <div class="tips">
+            <h3>📸 Tips for Better Results</h3>
+            <ul>
+                <li>Ensure good lighting on the recipe</li>
+                <li>Take photo from directly above</li>
+                <li>Use a clean, flat surface</li>
+                <li>Make sure text is clear and readable</li>
+                <li>Avoid shadows on the text</li>
+                <li>Use high resolution photos</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const preview = document.getElementById('preview');
+        const previewImg = document.getElementById('preview-img');
+        const form = document.getElementById('upload-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+
+        // Handle file selection
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // Handle drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (file) {
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                
+                // Update upload area text
+                uploadArea.querySelector('.upload-text').textContent = `Selected: ${file.name}`;
+                uploadArea.querySelector('.upload-hint').textContent = `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            formData.append('auto_normalize', 'true');
+            
+            // Show loading
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            
+            try {
+                const response = await fetch('/ingestion/api/process/', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', `
+                        ✅ Recipe uploaded successfully!<br>
+                        <strong>Job ID:</strong> ${data.job_id}<br>
+                        <strong>Recipes Found:</strong> ${data.recipes_found}<br>
+                        <strong>Recipes Saved:</strong> ${data.recipes_saved}<br>
+                        <strong>File:</strong> ${data.file_name}<br>
+                        <strong>Size:</strong> ${(data.file_size / 1024).toFixed(2)} KB
+                    `);
+                } else {
+                    showResult('error', `❌ Error: ${data.error}`);
+                }
+            } catch (error) {
+                showResult('error', `❌ Network error: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+
+        function showResult(type, message) {
+            result.className = `result ${type}`;
+            result.innerHTML = message;
+            result.style.display = 'block';
+            result.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
