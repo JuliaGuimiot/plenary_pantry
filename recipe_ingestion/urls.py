@@ -23,6 +23,10 @@ urlpatterns = [
     path('mappings/', views.ingredient_mappings, name='ingredient_mappings'),
     path('mappings/<int:mapping_id>/edit/', views.edit_ingredient_mapping, name='edit_mapping'),
     
+    # Email ingestion
+    path('email-mappings/', views.email_mappings, name='email_mappings'),
+    path('email-history/', views.email_ingestion_history, name='email_history'),
+    
     # API endpoints
     path('api/process/', views.api_process_source, name='api_process_source'),
     path('api/job/<uuid:job_id>/status/', views.api_job_status, name='api_job_status'),

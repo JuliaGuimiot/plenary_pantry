@@ -12,6 +12,7 @@ class IngestionSource(models.Model):
         ('url', 'Web URL'),
         ('text', 'Manual Text Input'),
         ('api', 'API Import'),
+        ('email', 'Email Attachment'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -147,3 +148,74 @@ class ProcessingLog(models.Model):
     
     def __str__(self):
         return f"{self.job.id} - {self.step}: {self.message}"
+
+
+class ApprovedEmailSender(models.Model):
+    """Approved email addresses that can send recipes to the system"""
+    email_address = models.EmailField(unique=True, help_text="Email address that can send recipes")
+    sender_name = models.CharField(max_length=200, blank=True, help_text="Optional name for the sender")
+    is_active = models.BooleanField(default=True, help_text="Whether this sender is active")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Approved Email Sender"
+        verbose_name_plural = "Approved Email Senders"
+        ordering = ['email_address']
+    
+    def __str__(self):
+        name = f" ({self.sender_name})" if self.sender_name else ""
+        return f"{self.email_address}{name}"
+
+
+class EmailIngestionSource(models.Model):
+    """Track email-based recipe ingestion sources"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    source = models.ForeignKey(IngestionSource, on_delete=models.CASCADE, related_name='email_details')
+    sender_email = models.EmailField(help_text="Email address of the sender")
+    sender_name = models.CharField(max_length=200, blank=True, help_text="Name of the sender")
+    subject = models.CharField(max_length=500, help_text="Email subject line")
+    received_at = models.DateTimeField(help_text="When the email was received")
+    message_id = models.CharField(max_length=500, unique=True, help_text="Email message ID for deduplication")
+    raw_email_content = models.TextField(blank=True, help_text="Raw email content for debugging")
+    attachment_count = models.PositiveIntegerField(default=0, help_text="Number of attachments processed")
+    is_approved_sender = models.BooleanField(default=False, help_text="Whether sender was on approved list")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Email Ingestion Source"
+        verbose_name_plural = "Email Ingestion Sources"
+        ordering = ['-received_at']
+    
+    def __str__(self):
+        return f"Email from {self.sender_email} - {self.subject}"
+
+
+class EmailAttachment(models.Model):
+    """Track individual email attachments for recipe processing"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email_source = models.ForeignKey(EmailIngestionSource, on_delete=models.CASCADE, related_name='attachments')
+    filename = models.CharField(max_length=500, help_text="Original filename of the attachment")
+    content_type = models.CharField(max_length=100, help_text="MIME type of the attachment")
+    file_size = models.PositiveIntegerField(help_text="Size of the attachment in bytes")
+    attachment_file = models.FileField(
+        upload_to='recipe_sources/email/',
+        help_text="Saved attachment file"
+    )
+    is_processed = models.BooleanField(default=False, help_text="Whether this attachment has been processed")
+    processing_error = models.TextField(blank=True, help_text="Error message if processing failed")
+    attachment_type = models.CharField(
+        max_length=20, 
+        choices=[('attachment', 'Attachment'), ('embedded', 'Embedded Image')],
+        default='attachment',
+        help_text="Type of attachment - traditional attachment or embedded image"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Email Attachment"
+        verbose_name_plural = "Email Attachments"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.filename} ({self.content_type})"

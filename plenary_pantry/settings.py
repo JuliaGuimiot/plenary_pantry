@@ -141,3 +141,15 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Email Ingestion Settings
+EMAIL_INGESTION_IMAP_SERVER = config('EMAIL_INGESTION_IMAP_SERVER', default='imap.gmail.com')
+EMAIL_INGESTION_IMAP_PORT = config('EMAIL_INGESTION_IMAP_PORT', default=993, cast=int)
+EMAIL_INGESTION_EMAIL = config('EMAIL_INGESTION_EMAIL', default='')
+EMAIL_INGESTION_PASSWORD = config('EMAIL_INGESTION_PASSWORD', default='')
+EMAIL_INGESTION_USE_SSL = config('EMAIL_INGESTION_USE_SSL', default=True, cast=bool)
+EMAIL_INGESTION_FOLDER = config('EMAIL_INGESTION_FOLDER', default='INBOX')
+EMAIL_INGESTION_POLL_INTERVAL = config('EMAIL_INGESTION_POLL_INTERVAL', default=300, cast=int)  # 5 minutes
+EMAIL_INGESTION_MAX_ATTACHMENT_SIZE = config('EMAIL_INGESTION_MAX_ATTACHMENT_SIZE', default=10485760, cast=int)  # 10MB
+EMAIL_INGESTION_DEFAULT_USER = config('EMAIL_INGESTION_DEFAULT_USER', default='admin', cast=str)  # Default user for email recipes
+EMAIL_INGESTION_RECIPIENT_ALIAS = config('EMAIL_INGESTION_RECIPIENT_ALIAS', default='', cast=str)  # Recipient email alias to filter by

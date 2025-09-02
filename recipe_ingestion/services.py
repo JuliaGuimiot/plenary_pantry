@@ -56,6 +56,8 @@ class RecipeIngestionService:
                 self._process_url_source(job, source)
             elif source.source_type == 'text':
                 self._process_text_source(job, source)
+            elif source.source_type == 'email':
+                self._process_email_source(job, source)
             else:
                 raise ValueError(f"Unsupported source type: {source.source_type}")
             
@@ -247,6 +249,59 @@ class RecipeIngestionService:
         job.save()
         
         self._log(job, f"Extracted {len(recipes)} recipes from text", "info")
+    
+    def _process_email_source(self, job: IngestionJob, source: IngestionSource):
+        """Process email sources with attachments"""
+        self._log(job, "Processing email source with attachments", "info")
+        
+        # Get email details
+        try:
+            from .models import EmailIngestionSource
+            email_source = source.email_details.first()
+            if not email_source:
+                raise ValueError("No email details found for email source")
+            
+            # Process each attachment
+            total_recipes = 0
+            for attachment in email_source.attachments.all():
+                if attachment.is_processed:
+                    continue
+                
+                try:
+                    # Create temporary source for this attachment
+                    temp_source = IngestionSource.objects.create(
+                        user=source.user,
+                        source_type='image',
+                        source_name=f"Email attachment: {attachment.filename}",
+                        source_file=attachment.attachment_file
+                    )
+                    
+                    # Process the attachment
+                    temp_job = self.process_source(temp_source)
+                    
+                    # Mark attachment as processed
+                    attachment.is_processed = True
+                    attachment.save()
+                    
+                    total_recipes += temp_job.recipes_found
+                    
+                    self._log(job, f"Processed attachment: {attachment.filename}", "info")
+                    
+                except Exception as e:
+                    self._log(job, f"Failed to process attachment {attachment.filename}: {str(e)}", "error")
+                    attachment.processing_error = str(e)
+                    attachment.save()
+                    continue
+            
+            job.recipes_found = total_recipes
+            job.recipes_processed = total_recipes
+            job.save()
+            
+            self._log(job, f"Processed {total_recipes} recipes from email attachments", "info")
+            
+        except Exception as e:
+            self._log(job, f"Email processing failed: {str(e)}", "error")
+            raise
     
     def _extract_text_from_image(self, image_path: str) -> str:
         """Extract text from image using OCR"""
@@ -730,16 +785,42 @@ class IngredientNormalizer:
     
     def __init__(self):
         self.quantity_patterns = [
-            r'(\d+(?:\.\d+)?)\s*(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters)',
-            r'(\d+(?:\.\d+)?)\s*(slice|slices|clove|cloves|bunch|bunches|can|cans|jar|jars|package|packages)',
-            r'(\d+)\s*-\s*(\d+)\s*(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons)',
+            # Most specific patterns first
+            r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*(cups|tablespoons|teaspoons|ounces|pounds|grams|kilograms|milliliters|liters|tbsp|tsp|oz|lb|g|kg|ml|l)',  # Handle ranges - plurals first
+            r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*(cup|tablespoon|teaspoon|ounce|pound|gram|kilogram|milliliter|liter)',  # Handle ranges - singulars
+            r'(\d+(?:\.\d+)?)\s*(large|medium|small)\s+(eggs|egg)',  # Handle sizes with eggs - plural first
             r'(\d+)\s*(egg|eggs)',  # Handle eggs
-            r'(\d+(?:\.\d+)?)\s*(large|medium|small)',  # Handle sizes
+            r'(\d+(?:\.\d+)?)\s*(cups|tablespoons|teaspoons|ounces|pounds|grams|kilograms|milliliters|liters|tbsp|tsp|oz|lb|g|kg|ml|l)',  # Plurals
+            r'(\d+(?:\.\d+)?)\s*(cup|tablespoon|teaspoon|ounce|pound|gram|kilogram|milliliter|liter)',  # Singulars
+            r'(\d+(?:\.\d+)?)\s*(slice|slices|clove|cloves|bunch|bunches|can|cans|jar|jars|package|packages)',
         ]
         
+        # Pattern for fractions
+        self.fraction_pattern = r'(\d+)/(\d+)\s*(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters)'
+        
         self.preparation_patterns = [
-            r'(chopped|diced|minced|sliced|grated|crushed|drained|rinsed|peeled|seeded|stemmed|trimmed)',
+            r'(chopped|diced|minced|sliced|grated|crushed|drained|rinsed|peeled|seeded|stemmed|trimmed|melted)',
         ]
+        
+        # Unit normalization mapping
+        self.unit_normalization = {
+            'cups': 'cup',
+            'tablespoons': 'tablespoon',
+            'teaspoons': 'teaspoon',
+            'ounces': 'ounce',
+            'pounds': 'pound',
+            'grams': 'gram',
+            'kilograms': 'kilogram',
+            'milliliters': 'milliliter',
+            'liters': 'liter',
+            'slices': 'slice',
+            'cloves': 'clove',
+            'bunches': 'bunch',
+            'cans': 'can',
+            'jars': 'jar',
+            'packages': 'package',
+            'eggs': 'egg',
+        }
     
     def normalize_ingredient(self, raw_text: str) -> Optional[Dict]:
         """Normalize raw ingredient text to structured format"""
@@ -764,10 +845,11 @@ class IngredientNormalizer:
                 name=parsed['ingredient_name']
             )
             
-            # Get or create unit
+            # Get or create unit (normalize to singular form)
             unit = None
             if parsed['unit']:
-                unit, _ = Unit.objects.get_or_create(name=parsed['unit'])
+                normalized_unit_name = self._normalize_unit_name(parsed['unit'])
+                unit, _ = Unit.objects.get_or_create(name=normalized_unit_name)
             
             # Create mapping for future use
             IngredientMapping.objects.create(
@@ -790,6 +872,10 @@ class IngredientNormalizer:
             logger.error(f"Failed to normalize ingredient '{raw_text}': {str(e)}")
             return None
     
+    def _normalize_unit_name(self, unit_name: str) -> str:
+        """Normalize unit name to singular form"""
+        return self.unit_normalization.get(unit_name, unit_name)
+    
     def _parse_ingredient(self, text: str) -> Optional[Dict]:
         """Parse ingredient text into components"""
         text = text.strip().lower()
@@ -802,19 +888,40 @@ class IngredientNormalizer:
         quantity = None
         unit = None
         
-        for pattern in self.quantity_patterns:
-            match = re.search(pattern, text)
-            if match:
-                if len(match.groups()) == 2:
-                    quantity = Decimal(match.group(1))
-                    unit = match.group(2)
-                elif len(match.groups()) == 3:
-                    # Handle ranges like "1-2 cups"
-                    min_qty = Decimal(match.group(1))
-                    max_qty = Decimal(match.group(2))
-                    quantity = (min_qty + max_qty) / 2  # Use average
-                    unit = match.group(3)
-                break
+        # First check for fractions
+        fraction_match = re.search(self.fraction_pattern, text)
+        if fraction_match:
+            numerator = Decimal(fraction_match.group(1))
+            denominator = Decimal(fraction_match.group(2))
+            quantity = numerator / denominator
+            unit = fraction_match.group(3)
+        else:
+            # Check patterns in order of specificity (most specific first)
+            for i, pattern in enumerate(self.quantity_patterns):
+                match = re.search(pattern, text)
+                if match:
+                    groups = match.groups()
+                    if len(groups) == 2:
+                        # Regular pattern: quantity + unit
+                        quantity = Decimal(groups[0])
+                        unit = groups[1]
+                    elif len(groups) == 3:
+                        # Check if this is a range pattern (has '-' in the match)
+                        if '-' in match.group(0):
+                            # Range pattern: min_qty + max_qty + unit
+                            min_qty = Decimal(groups[0])
+                            max_qty = Decimal(groups[1])
+                            quantity = (min_qty + max_qty) / 2  # Use average
+                            unit = groups[2]
+                        elif groups[1] in ['large', 'medium', 'small']:
+                            # Size pattern: quantity + size + eggs
+                            quantity = Decimal(groups[0])
+                            unit = groups[1]  # "large", "medium", "small"
+                        else:
+                            # Regular 3-group pattern
+                            quantity = Decimal(groups[0])
+                            unit = groups[1]
+                    break
         
         # Extract preparation method
         preparation_method = ""
@@ -829,7 +936,29 @@ class IngredientNormalizer:
         
         # Remove quantity and unit
         if quantity and unit:
-            ingredient_name = re.sub(rf'\d+(?:\.\d+)?\s*{re.escape(unit)}', '', ingredient_name)
+            # Handle different patterns
+            if '/' in text and 'cup' in text.lower():
+                # Handle fraction patterns like "1/2 cup"
+                fraction_unit_pattern = rf'\d+/\d+\s*{re.escape(unit)}s?'
+                ingredient_name = re.sub(fraction_unit_pattern, '', ingredient_name)
+            elif '-' in text and re.search(r'\d+\s*-\s*\d+', text):
+                # Handle range patterns like "1-2 cups"
+                range_unit_pattern = rf'\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?\s*{re.escape(unit)}s?'
+                ingredient_name = re.sub(range_unit_pattern, '', ingredient_name)
+            elif unit in ['large', 'medium', 'small']:
+                # Handle size patterns like "2 large eggs" - extract the ingredient name
+                size_pattern = rf'\d+(?:\.\d+)?\s*{re.escape(unit)}\s+(eggs|egg)'
+                match = re.search(size_pattern, ingredient_name)
+                if match:
+                    ingredient_name = match.group(1)  # Extract "eggs" or "egg"
+            else:
+                # Handle regular patterns
+                # Don't add 's' if unit is already plural
+                if unit.endswith('s'):
+                    unit_pattern = rf'\d+(?:\.\d+)?\s*{re.escape(unit)}'
+                else:
+                    unit_pattern = rf'\d+(?:\.\d+)?\s*{re.escape(unit)}s?'
+                ingredient_name = re.sub(unit_pattern, '', ingredient_name)
         
         # Remove preparation method
         if preparation_method:
@@ -931,7 +1060,9 @@ class RecipeParser:
         # Look for the first non-empty line that looks like a title
         for line in lines[:5]:  # Check first 5 lines
             line = line.strip()
-            if line and len(line) < 100 and not line.lower().startswith(('ingredients', 'instructions', 'directions', 'prep', 'cook')):
+            if (line and len(line) < 100 and 
+                not line.lower().startswith(('ingredients', 'instructions', 'directions', 'prep', 'cook')) and
+                not line.lower().startswith(('no name', 'untitled'))):  # Skip placeholder names
                 return line
         
         return "Untitled Recipe"
@@ -1080,9 +1211,9 @@ class RecipeParser:
                 break
         
         # Extract difficulty
-        difficulty_match = re.search(r'(easy|medium|hard|difficult)', text, re.IGNORECASE)
+        difficulty_match = re.search(r'difficulty[:\s]*(easy|medium|hard|difficult)', text, re.IGNORECASE)
         if difficulty_match:
-            metadata['difficulty'] = difficulty_match.group(1)
+            metadata['difficulty'] = difficulty_match.group(1).lower()
         
         return metadata
     
@@ -1100,6 +1231,6 @@ class RecipeParser:
         
         # Instructions confidence
         if instructions and instructions != "Instructions not found":
-            confidence += min(0.4, len(instructions.split()) * 0.001)
+            confidence += min(0.4, len(instructions.split()) * 0.02)
         
         return min(1.0, confidence)

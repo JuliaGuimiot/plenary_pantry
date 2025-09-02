@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Ingestion History - Plenary Pantry</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .email-item {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            background: #f9f9f9;
+            overflow: hidden;
+        }
+        
+        .email-header {
+            background: #667eea;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .email-sender {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .email-date {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .email-content {
+            padding: 20px;
+        }
+        
+        .email-subject {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .email-meta {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .attachments-section {
+            margin-top: 15px;
+        }
+        
+        .attachments-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .attachment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .attachment-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .attachment-icon {
+            font-size: 20px;
+        }
+        
+        .attachment-details {
+            flex: 1;
+        }
+        
+        .attachment-filename {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .attachment-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .attachment-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-processed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .pagination a, .pagination span {
+            padding: 8px 12px;
+            margin: 0 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+        }
+        
+        .pagination .current {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .pagination a:hover {
+            background: #f0f0f0;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 20px;
+        }
+        
+        .empty-state p {
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .back-link {
+            margin-bottom: 20px;
+        }
+        
+        .back-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back-link">
+            <a href="{% url 'ingestion:dashboard' %}">← Back to Dashboard</a>
+        </div>
+        
+        <h1>📧 Email Ingestion History</h1>
+        
+        {% if email_sources %}
+            {% for email_source in email_sources %}
+                <div class="email-item">
+                    <div class="email-header">
+                        <div class="email-sender">
+                            {% if email_source.sender_name %}
+                                {{ email_source.sender_name }} &lt;{{ email_source.sender_email }}&gt;
+                            {% else %}
+                                {{ email_source.sender_email }}
+                            {% endif %}
+                        </div>
+                        <div class="email-date">
+                            {{ email_source.received_at|date:"M d, Y H:i" }}
+                        </div>
+                    </div>
+                    
+                    <div class="email-content">
+                        <div class="email-subject">{{ email_source.subject }}</div>
+                        
+                        <div class="email-meta">
+                            <span>📎 {{ email_source.attachment_count }} attachment{{ email_source.attachment_count|pluralize }}</span>
+                            <span>🆔 {{ email_source.message_id|truncatechars:30 }}</span>
+                        </div>
+                        
+                        {% if email_source.attachments.all %}
+                            <div class="attachments-section">
+                                <div class="attachments-title">Attachments:</div>
+                                {% for attachment in email_source.attachments.all %}
+                                    <div class="attachment-item">
+                                        <div class="attachment-info">
+                                            <div class="attachment-icon">
+                                                {% if 'image' in attachment.content_type %}
+                                                    🖼️
+                                                {% else %}
+                                                    📄
+                                                {% endif %}
+                                            </div>
+                                            <div class="attachment-details">
+                                                <div class="attachment-filename">{{ attachment.filename }}</div>
+                                                <div class="attachment-meta">
+                                                    {{ attachment.content_type }} • 
+                                                    {{ attachment.file_size|filesizeformat }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="attachment-status 
+                                            {% if attachment.is_processed %}
+                                                status-processed
+                                            {% elif attachment.processing_error %}
+                                                status-error
+                                            {% else %}
+                                                status-pending
+                                            {% endif %}">
+                                            {% if attachment.is_processed %}
+                                                ✓ Processed
+                                            {% elif attachment.processing_error %}
+                                                ✗ Error
+                                            {% else %}
+                                                ⏳ Pending
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    {% if attachment.processing_error %}
+                                        <div style="margin-top: 5px; padding: 8px; background: #f8d7da; color: #721c24; border-radius: 4px; font-size: 12px;">
+                                            Error: {{ attachment.processing_error }}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+            
+            {% if page_obj.has_other_pages %}
+                <div class="pagination">
+                    {% if page_obj.has_previous %}
+                        <a href="?page=1">&laquo; First</a>
+                        <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                    {% endif %}
+                    
+                    <span class="current">
+                        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                    </span>
+                    
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}">Next</a>
+                        <a href="?page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="empty-state">
+                <h3>No Email History</h3>
+                <p>No emails have been processed yet. Set up email mappings to start receiving recipe photos via email.</p>
+                <a href="{% url 'ingestion:email_mappings' %}" class="btn">
+                    Manage Email Mappings
+                </a>
+            </div>
+        {% endif %}
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="{% url 'ingestion:email_mappings' %}" class="btn btn-secondary">
+                Manage Email Mappings
+            </a>
+            <a href="{% url 'ingestion:dashboard' %}" class="btn btn-secondary">
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+</body>
+</html>

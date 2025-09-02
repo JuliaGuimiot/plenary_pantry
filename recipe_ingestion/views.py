@@ -613,3 +613,80 @@ def delete_job(request, job_id):
     }
     
     return render(request, 'recipe_ingestion/delete_job.html', context)
+
+
+@login_required
+def email_mappings(request):
+    """Manage user email mappings"""
+    from .models import UserEmailMapping
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'add':
+            email_address = request.POST.get('email_address')
+            if email_address:
+                try:
+                    UserEmailMapping.objects.create(
+                        user=request.user,
+                        email_address=email_address
+                    )
+                    messages.success(request, f'Email mapping added: {email_address}')
+                except Exception as e:
+                    messages.error(request, f'Error adding email mapping: {str(e)}')
+        
+        elif action == 'toggle':
+            mapping_id = request.POST.get('mapping_id')
+            try:
+                mapping = UserEmailMapping.objects.get(id=mapping_id, user=request.user)
+                mapping.is_active = not mapping.is_active
+                mapping.save()
+                status = 'activated' if mapping.is_active else 'deactivated'
+                messages.success(request, f'Email mapping {status}: {mapping.email_address}')
+            except UserEmailMapping.DoesNotExist:
+                messages.error(request, 'Email mapping not found')
+        
+        elif action == 'delete':
+            mapping_id = request.POST.get('mapping_id')
+            try:
+                mapping = UserEmailMapping.objects.get(id=mapping_id, user=request.user)
+                email_address = mapping.email_address
+                mapping.delete()
+                messages.success(request, f'Email mapping deleted: {email_address}')
+            except UserEmailMapping.DoesNotExist:
+                messages.error(request, 'Email mapping not found')
+        
+        return redirect('email_mappings')
+    
+    # Get user's email mappings
+    mappings = UserEmailMapping.objects.filter(user=request.user).order_by('-created_at')
+    
+    context = {
+        'mappings': mappings,
+    }
+    
+    return render(request, 'recipe_ingestion/email_mappings.html', context)
+
+
+@login_required
+def email_ingestion_history(request):
+    """View email ingestion history"""
+    from .models import EmailIngestionSource
+    from django.core.paginator import Paginator
+    
+    # Get email sources for the user
+    email_sources = EmailIngestionSource.objects.filter(
+        source__user=request.user
+    ).select_related('source').prefetch_related('attachments').order_by('-received_at')
+    
+    # Pagination
+    paginator = Paginator(email_sources, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'email_sources': page_obj,
+    }
+    
+    return render(request, 'recipe_ingestion/email_history.html', context)

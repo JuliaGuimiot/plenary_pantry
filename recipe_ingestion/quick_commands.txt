@@ -1,0 +1,16 @@
+# quick commands
+# Show all recipes in detailed format
+uv run python manage.py list_recipes
+
+# Show compact format with limit
+uv run python manage.py list_recipes --format=compact --limit=5
+
+# Show recipes for specific user
+uv run python manage.py list_recipes --user=admin --format=summary
+
+# Show detailed with ratings and favorites
+
+ --include-ratings --include-favorites
+
+# Get help
+uv run python manage.py list_recipes --help

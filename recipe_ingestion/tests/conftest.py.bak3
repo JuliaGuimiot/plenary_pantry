@@ -1,0 +1,16 @@
+"""
+Pytest configuration for recipe ingestion tests.
+"""
+
+import os
+import sys
+
+# Add the project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Also add current directory for pytest
+current_dir = os.getcwd()
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)

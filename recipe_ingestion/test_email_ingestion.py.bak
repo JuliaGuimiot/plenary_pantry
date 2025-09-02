@@ -1,0 +1,161 @@
+#!/usr/bin/env python
+"""
+Test script for email ingestion functionality
+Run this to verify the email ingestion system is working correctly
+"""
+
+import os
+import sys
+import django
+from django.conf import settings
+
+# Add the project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+# Setup Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'plenary_pantry.settings')
+django.setup()
+
+from django.contrib.auth.models import User
+from recipe_ingestion.models import ApprovedEmailSender, IngestionSource
+from recipe_ingestion.email_service import EmailIngestionService
+
+
+def test_email_ingestion_setup():
+    """Test basic email ingestion setup"""
+    print("🧪 Testing Email Ingestion Setup...")
+    
+    # Test 1: Check if email configuration is set
+    print("\n1. Checking email configuration...")
+    email = settings.EMAIL_INGESTION_EMAIL
+    password = settings.EMAIL_INGESTION_PASSWORD
+    
+    if not email or not password:
+        print("❌ Email configuration not set!")
+        print("   Please set EMAIL_INGESTION_EMAIL and EMAIL_INGESTION_PASSWORD in your .env file")
+        return False
+    else:
+        print(f"✅ Email configured: {email}")
+    
+    # Test 2: Check IMAP server settings
+    print("\n2. Checking IMAP server settings...")
+    server = settings.EMAIL_INGESTION_IMAP_SERVER
+    port = settings.EMAIL_INGESTION_IMAP_PORT
+    print(f"✅ IMAP Server: {server}:{port}")
+    
+    # Test 3: Test email service initialization
+    print("\n3. Testing email service initialization...")
+    try:
+        email_service = EmailIngestionService()
+        print("✅ Email service initialized successfully")
+    except Exception as e:
+        print(f"❌ Email service initialization failed: {e}")
+        return False
+    
+    # Test 4: Check if we can create a test approved sender
+    print("\n4. Testing approved sender setup...")
+    try:
+        # Create test approved sender
+        sender, created = ApprovedEmailSender.objects.get_or_create(
+            email_address='test.sender@example.com',
+            defaults={
+                'sender_name': 'Test Sender',
+                'is_active': True
+            }
+        )
+        if created:
+            print(f"✅ Created test approved sender: {sender.email_address}")
+        else:
+            print(f"✅ Using existing approved sender: {sender.email_address}")
+            
+    except Exception as e:
+        print(f"❌ Approved sender test failed: {e}")
+        return False
+    
+    print("\n🎉 All setup tests passed!")
+    return True
+
+
+def test_email_polling():
+    """Test email polling functionality"""
+    print("\n🧪 Testing Email Polling...")
+    
+    try:
+        email_service = EmailIngestionService()
+        
+        # Test IMAP connection
+        print("\n1. Testing IMAP connection...")
+        try:
+            with email_service._connect_to_imap() as mail:
+                print("✅ IMAP connection successful")
+                
+                # Test folder selection
+                status, messages = mail.select(email_service.folder)
+                if status == 'OK':
+                    print(f"✅ Folder '{email_service.folder}' accessible")
+                else:
+                    print(f"❌ Cannot access folder '{email_service.folder}': {status}")
+                    return False
+                    
+        except Exception as e:
+            print(f"❌ IMAP connection failed: {e}")
+            print("   Please check your email credentials and server settings")
+            return False
+        
+        # Test email polling (dry run)
+        print("\n2. Testing email polling...")
+        try:
+            stats = email_service.poll_emails()
+            print(f"✅ Email polling completed:")
+            print(f"   - Emails processed: {stats['emails_processed']}")
+            print(f"   - Attachments processed: {stats['attachments_processed']}")
+            print(f"   - Recipes created: {stats['recipes_created']}")
+            print(f"   - Errors: {stats['errors']}")
+        except Exception as e:
+            print(f"❌ Email polling failed: {e}")
+            return False
+        
+        print("\n🎉 Email polling test passed!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Email polling test failed: {e}")
+        return False
+
+
+def main():
+    """Run all email ingestion tests"""
+    print("🚀 Email Ingestion Test Suite")
+    print("=" * 50)
+    
+    # Run setup tests
+    setup_ok = test_email_ingestion_setup()
+    
+    if not setup_ok:
+        print("\n❌ Setup tests failed. Please fix configuration issues before proceeding.")
+        return False
+    
+    # Run polling tests
+    polling_ok = test_email_polling()
+    
+    if not polling_ok:
+        print("\n❌ Polling tests failed. Please check email server connectivity.")
+        return False
+    
+    print("\n🎉 All tests passed! Email ingestion is ready to use.")
+    print("\nNext steps:")
+    print("1. Add approved email senders:")
+    print("   uv run python manage.py manage_approved_senders --add 'email@domain.com'")
+    print("   uv run python manage.py manage_approved_senders --add 'John Doe <john@domain.com>'")
+    print("2. Start email polling:")
+    print("   uv run python manage.py poll_emails --once  # Test once")
+    print("   uv run python manage.py poll_emails         # Run continuously")
+    print("3. Send test emails with recipe photos to your configured email address")
+    
+    return True
+
+
+if __name__ == '__main__':
+    success = main()
+    sys.exit(0 if success else 1)
