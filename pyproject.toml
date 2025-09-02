@@ -24,10 +24,12 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "plenary_pantry.settings"
+DJANGO_SETTINGS_MODULE = "plenary_pantry.test_settings"
+django_find_project = false
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+pythonpath = ["."]
 addopts = ["--tb=short", "--strict-markers", "--import-mode=importlib"]
 testpaths = ["recipe_ingestion/tests"]
 norecursedirs = [".git", ".tox", "dist", "build", "*.egg", "recipe_ingestion/management", "recipe_ingestion/migrations", "recipe_ingestion/__pycache__"]
