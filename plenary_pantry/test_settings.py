@@ -5,6 +5,23 @@ This file extends the main settings but overrides the database to use SQLite for
 
 from .settings import *
 
+# Add core app to INSTALLED_APPS for testing
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    
+    # Third-party apps
+    'django_extensions',
+    
+    # Custom apps
+    'core',
+    'recipe_ingestion',
+]
+
 # Use in-memory SQLite database for testing
 DATABASES = {
     'default': {

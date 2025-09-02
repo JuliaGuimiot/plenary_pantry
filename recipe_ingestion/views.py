@@ -17,7 +17,7 @@ from .models import (
     IngredientMapping, ProcessingLog
 )
 from .services import RecipeIngestionService
-from plenary_pantry.models import Recipe
+from core.models import Recipe
 
 logger = logging.getLogger(__name__)
 
@@ -288,7 +288,7 @@ def edit_ingredient_mapping(request, mapping_id):
             preparation_method = request.POST.get('preparation_method', '')
             
             if ingredient_id:
-                from plenary_pantry.models import Ingredient, Unit
+                from core.models import Ingredient, Unit
                 ingredient = get_object_or_404(Ingredient, id=ingredient_id)
                 mapping.normalized_ingredient = ingredient
             
@@ -309,7 +309,7 @@ def edit_ingredient_mapping(request, mapping_id):
             messages.error(request, f'Failed to update mapping: {str(e)}')
     
     # Get available ingredients and units for dropdown
-    from plenary_pantry.models import Ingredient, Unit
+    from core.models import Ingredient, Unit
     ingredients = Ingredient.objects.all().order_by('name')
     units = Unit.objects.all().order_by('name')
     

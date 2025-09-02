@@ -25,7 +25,7 @@ from .models import (
     IngestionSource, IngestionJob, ExtractedRecipe, 
     IngredientMapping, ProcessingLog, RecipeTemplate
 )
-from plenary_pantry.models import (
+from core.models import (
     Recipe, RecipeIngredient, Ingredient, Unit, 
     Difficulty, Cuisine, Course, Diet
 )

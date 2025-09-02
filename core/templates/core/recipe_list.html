@@ -1,0 +1,322 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}My Recipes - Plenary Pantry{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="display-6 fw-bold text-primary mb-2">
+                    <i class="bi bi-journal-text me-2"></i>My Recipes
+                </h1>
+                <p class="lead text-muted">Manage and organize your personal recipe collection.</p>
+            </div>
+            <a href="{% url 'ingestion_dashboard' %}" class="btn btn-primary btn-lg">
+                <i class="bi bi-plus-circle me-2"></i>Add Recipe
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <!-- Search -->
+                    <div class="col-md-4">
+                        <label for="q" class="form-label">Search Recipes</label>
+                        <input type="text" class="form-control" id="q" name="q" 
+                               value="{{ search_query }}" placeholder="Search by name, description, or instructions...">
+                    </div>
+                    
+                    <!-- Difficulty Filter -->
+                    <div class="col-md-2">
+                        <label for="difficulty" class="form-label">Difficulty</label>
+                        <select class="form-select" id="difficulty" name="difficulty">
+                            <option value="">All Difficulties</option>
+                            {% for diff in difficulties %}
+                                <option value="{{ diff.name }}" {% if difficulty == diff.name %}selected{% endif %}>
+                                    {{ diff.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Cuisine Filter -->
+                    <div class="col-md-2">
+                        <label for="cuisine" class="form-label">Cuisine</label>
+                        <select class="form-select" id="cuisine" name="cuisine">
+                            <option value="">All Cuisines</option>
+                            {% for cui in cuisines %}
+                                <option value="{{ cui.name }}" {% if cuisine == cui.name %}selected{% endif %}>
+                                    {{ cui.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Course Filter -->
+                    <div class="col-md-2">
+                        <label for="course" class="form-label">Course</label>
+                        <select class="form-select" id="course" name="course">
+                            <option value="">All Courses</option>
+                            {% for cou in courses %}
+                                <option value="{{ cou.name }}" {% if course == cou.name %}selected{% endif %}>
+                                    {{ cou.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Diet Filter -->
+                    <div class="col-md-2">
+                        <label for="diet" class="form-label">Diet</label>
+                        <select class="form-select" id="diet" name="diet">
+                            <option value="">All Diets</option>
+                            {% for d in diets %}
+                                <option value="{{ d.name }}" {% if diet == d.name %}selected{% endif %}>
+                                    {{ d.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Filter Buttons -->
+                    <div class="col-12">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-2"></i>Apply Filters
+                            </button>
+                            <a href="{% url 'core:recipe_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Clear Filters
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Summary -->
+{% if search_query or difficulty or cuisine or course or diet %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            Showing filtered results
+            {% if search_query %}for "{{ search_query }}"{% endif %}
+            {% if difficulty %}• Difficulty: {{ difficulty }}{% endif %}
+            {% if cuisine %}• Cuisine: {{ cuisine }}{% endif %}
+            {% if course %}• Course: {{ course }}{% endif %}
+            {% if diet %}• Diet: {{ diet }}{% endif %}
+            <span class="badge bg-primary ms-2">{{ page_obj.paginator.count }} recipes</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Recipe Grid -->
+{% if page_obj %}
+    <div class="row">
+        {% for recipe in page_obj %}
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card recipe-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title mb-0">
+                                <a href="{% url 'core:recipe_detail' recipe.id %}" class="text-decoration-none">
+                                    {{ recipe.name }}
+                                </a>
+                            </h5>
+                            <button class="favorite-btn {% if recipe in user.favorite_recipes.all %}active{% endif %}" 
+                                    data-recipe-id="{{ recipe.id }}" title="Toggle favorite">
+                                <i class="bi bi-heart{% if recipe in user.favorite_recipes.all %}-fill{% endif %}"></i>
+                            </button>
+                        </div>
+                        
+                        {% if recipe.description %}
+                            <p class="card-text text-muted">{{ recipe.description|truncatewords:20 }}</p>
+                        {% endif %}
+                        
+                        <div class="row text-center mb-3">
+                            <div class="col-4">
+                                <small class="text-muted d-block">Prep</small>
+                                <span class="fw-bold">{{ recipe.prep_time }}m</span>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block">Cook</small>
+                                <span class="fw-bold">{{ recipe.cook_time }}m</span>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block">Servings</small>
+                                <span class="fw-bold">{{ recipe.servings }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {% if recipe.difficulty %}
+                                <span class="badge bg-secondary me-1">{{ recipe.difficulty.name }}</span>
+                            {% endif %}
+                            {% if recipe.cuisine %}
+                                <span class="badge bg-info me-1">{{ recipe.cuisine.name }}</span>
+                            {% endif %}
+                            {% if recipe.course %}
+                                <span class="badge bg-success me-1">{{ recipe.course.name }}</span>
+                            {% endif %}
+                            {% if recipe.diet %}
+                                <span class="badge bg-warning text-dark me-1">{{ recipe.diet.name }}</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                {{ recipe.created_at|date:"M j, Y" }}
+                            </small>
+                            <a href="{% url 'core:recipe_detail' recipe.id %}" class="btn btn-sm btn-outline-primary">
+                                View Recipe
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="Recipe pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if course %}&course={{ course }}{% endif %}{% if diet %}&diet={{ diet }}{% endif %}">
+                                    <i class="bi bi-chevron-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if course %}&course={{ course }}{% endif %}{% if diet %}&diet={{ diet }}{% endif %}">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if course %}&course={{ course }}{% endif %}{% if diet %}&diet={{ diet }}{% endif %}">
+                                        {{ num }}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if course %}&course={{ course }}{% endif %}{% if diet %}&diet={{ diet }}{% endif %}">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&q={{ search_query }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if course %}&course={{ course }}{% endif %}{% if diet %}&diet={{ diet }}{% endif %}">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                
+                <div class="text-center text-muted">
+                    <small>
+                        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} recipes
+                    </small>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+{% else %}
+    <!-- No Results -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-journal-x display-1 text-muted mb-3"></i>
+                    <h4 class="text-muted">No recipes found</h4>
+                    <p class="text-muted mb-4">
+                        {% if search_query or difficulty or cuisine or course or diet %}
+                            Try adjusting your search criteria or filters.
+                        {% else %}
+                            You haven't added any recipes yet.
+                        {% endif %}
+                    </p>
+                    <a href="{% url 'ingestion_dashboard' %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-plus-circle me-2"></i>Add Your First Recipe
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning me-2"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'ingestion_dashboard' %}" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-plus-circle me-2"></i>Add Recipe
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:public_recipes' %}" class="btn btn-outline-info w-100">
+                            <i class="bi bi-globe me-2"></i>Discover Recipes
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:ingredient_list' %}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-basket me-2"></i>Manage Ingredients
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:menu_planning' %}" class="btn btn-outline-warning w-100">
+                            <i class="bi bi-calendar-week me-2"></i>Plan Menu
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-submit form when filters change
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterSelects = document.querySelectorAll('select[name]');
+        filterSelects.forEach(select => {
+            select.addEventListener('change', function() {
+                this.closest('form').submit();
+            });
+        });
+    });
+</script>
+{% endblock %}

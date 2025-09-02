@@ -33,7 +33,7 @@ from recipe_ingestion.models import (
     IngredientMapping,
     ProcessingLog
 )
-from plenary_pantry.models import (
+from core.models import (
     Recipe, 
     RecipeIngredient, 
     Ingredient, 

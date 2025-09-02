@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Count, Prefetch
-from plenary_pantry.models import Ingredient, Unit, RecipeIngredient
+from core.models import Ingredient, Unit, RecipeIngredient
 from recipe_ingestion.models import IngredientMapping
 import textwrap
 

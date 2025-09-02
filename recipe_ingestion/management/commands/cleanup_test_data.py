@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from recipe_ingestion.models import IngestionSource, IngestionJob, ExtractedRecipe
-from plenary_pantry.models import Recipe
+from core.models import Recipe
 
 
 class Command(BaseCommand):

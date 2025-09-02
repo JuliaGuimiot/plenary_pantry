@@ -1,0 +1,214 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Ingredients - Plenary Pantry{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="display-6 fw-bold text-primary mb-2">
+                    <i class="bi bi-basket me-2"></i>Ingredients
+                </h1>
+                <p class="lead text-muted">Browse ingredients used in your recipes.</p>
+            </div>
+            <a href="{% url 'admin:core_ingredient_add' %}" class="btn btn-primary btn-lg" target="_blank">
+                <i class="bi bi-plus-circle me-2"></i>Add Ingredient
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-8">
+                        <label for="q" class="form-label">Search Ingredients</label>
+                        <input type="text" class="form-control" id="q" name="q" 
+                               value="{{ search_query }}" placeholder="Search ingredient names...">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="d-flex gap-2 w-100">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-2"></i>Search
+                            </button>
+                            <a href="{% url 'core:ingredient_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Clear
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Summary -->
+{% if search_query %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            Showing results for "{{ search_query }}"
+            <span class="badge bg-primary ms-2">{{ page_obj.paginator.count }} ingredients</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Ingredients Grid -->
+{% if page_obj %}
+    <div class="row">
+        {% for ingredient in page_obj %}
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title mb-0">{{ ingredient.name }}</h5>
+                            <a href="{% url 'admin:core_ingredient_change' ingredient.id %}" 
+                               class="btn btn-sm btn-outline-primary" target="_blank">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                        
+                        {% if ingredient.description %}
+                            <p class="card-text text-muted">{{ ingredient.description|truncatewords:15 }}</p>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                Added {{ ingredient.created_at|date:"M j, Y" }}
+                            </small>
+                            <span class="badge bg-secondary">
+                                {{ ingredient.recipeingredient_set.count }} recipes
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="Ingredient pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}">
+                                    <i class="bi bi-chevron-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}">
+                                        {{ num }}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&q={{ search_query }}{% endif %}">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                
+                <div class="text-center text-muted">
+                    <small>
+                        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} ingredients
+                    </small>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+{% else %}
+    <!-- No Results -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-basket display-1 text-muted mb-3"></i>
+                    <h4 class="text-muted">No ingredients found</h4>
+                    <p class="text-muted mb-4">
+                        {% if search_query %}
+                            Try adjusting your search terms.
+                        {% else %}
+                            You haven't added any ingredients yet.
+                        {% endif %}
+                    </p>
+                    <a href="{% url 'admin:core_ingredient_add' %}" class="btn btn-primary btn-lg" target="_blank">
+                        <i class="bi bi-plus-circle me-2"></i>Add First Ingredient
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning me-2"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'admin:core_ingredient_add' %}" class="btn btn-outline-primary w-100" target="_blank">
+                            <i class="bi bi-plus-circle me-2"></i>Add Ingredient
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:recipe_list' %}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-journal-text me-2"></i>View Recipes
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:pantry' %}" class="btn btn-outline-warning w-100">
+                            <i class="bi bi-box-seam me-2"></i>Check Pantry
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:shopping_lists' %}" class="btn btn-outline-info w-100">
+                            <i class="bi bi-cart-check me-2"></i>Shopping Lists
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

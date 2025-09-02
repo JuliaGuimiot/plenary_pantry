@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'django_extensions',
     
     # Custom apps
-    'plenary_pantry',
+    'core',
     'recipe_ingestion',
 ]
 

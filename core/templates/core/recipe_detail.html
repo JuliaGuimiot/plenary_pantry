@@ -1,0 +1,368 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ recipe.name }} - Plenary Pantry{% endblock %}
+
+{% block content %}
+<!-- Recipe Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'core:dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'core:recipe_list' %}">Recipes</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ recipe.name }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h1 class="display-5 fw-bold text-primary mb-2">{{ recipe.name }}</h1>
+                {% if recipe.description %}
+                    <p class="lead text-muted">{{ recipe.description }}</p>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                <button class="favorite-btn {% if is_favorited %}active{% endif %}" 
+                        data-recipe-id="{{ recipe.id }}" title="Toggle favorite">
+                    <i class="bi bi-heart{% if is_favorited %}-fill{% endif %}"></i>
+                </button>
+                <a href="{% url 'admin:core_recipe_change' recipe.id %}" class="btn btn-outline-secondary" target="_blank">
+                    <i class="bi bi-pencil me-2"></i>Edit
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recipe Information Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-clock display-6 text-primary mb-2"></i>
+                <h5 class="card-title">{{ recipe.prep_time|add:recipe.cook_time }}</h5>
+                <p class="card-text text-muted">Total Time (min)</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-people display-6 text-success mb-2"></i>
+                <h5 class="card-title">{{ recipe.servings }}</h5>
+                <p class="card-text text-muted">Servings</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-star-fill display-6 text-warning mb-2"></i>
+                <h5 class="card-title">{{ avg_rating }}/5</h5>
+                <p class="card-text text-muted">Average Rating</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-calendar3 display-6 text-info mb-2"></i>
+                <h5 class="card-title">{{ recipe.created_at|date:"M j" }}</h5>
+                <p class="card-text text-muted">Added</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recipe Details and Ingredients -->
+<div class="row">
+    <!-- Recipe Details -->
+    <div class="col-lg-8 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle me-2"></i>Recipe Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Prep Time:</strong> {{ recipe.prep_time }} minutes<br>
+                        <strong>Cook Time:</strong> {{ recipe.cook_time }} minutes
+                    </div>
+                    <div class="col-md-6">
+                        {% if recipe.difficulty %}
+                            <strong>Difficulty:</strong> 
+                            <span class="badge bg-secondary">{{ recipe.difficulty.name }}</span><br>
+                        {% endif %}
+                        {% if recipe.cuisine %}
+                            <strong>Cuisine:</strong> 
+                            <span class="badge bg-info">{{ recipe.cuisine.name }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if recipe.course %}
+                    <div class="mb-3">
+                        <strong>Course:</strong> 
+                        <span class="badge bg-success">{{ recipe.course.name }}</span>
+                    </div>
+                {% endif %}
+                
+                {% if recipe.diet %}
+                    <div class="mb-3">
+                        <strong>Diet:</strong> 
+                        <span class="badge bg-warning text-dark">{{ recipe.diet.name }}</span>
+                    </div>
+                {% endif %}
+                
+                {% if recipe.source_name %}
+                    <div class="mb-3">
+                        <strong>Source:</strong> 
+                        {% if recipe.source_url %}
+                            <a href="{{ recipe.source_url }}" target="_blank">{{ recipe.source_name }}</a>
+                        {% else %}
+                            {{ recipe.source_name }}
+                        {% endif %}
+                        {% if recipe.source_type %}
+                            <small class="text-muted">({{ recipe.source_type }})</small>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <strong>Created by:</strong> {{ recipe.created_by.username }}<br>
+                    <strong>Last updated:</strong> {{ recipe.updated_at|date:"F j, Y" }}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ingredients -->
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-basket me-2"></i>Ingredients
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if ingredients %}
+                    <div class="list-group list-group-flush">
+                        {% for ingredient in ingredients %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+                                <div>
+                                    <strong>{{ ingredient.quantity }} {{ ingredient.unit.name }}</strong><br>
+                                    <span class="text-muted">{{ ingredient.ingredient.name }}</span>
+                                    {% if ingredient.preparation_method %}
+                                        <br><small class="text-muted">({{ ingredient.preparation_method }})</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center my-3">No ingredients listed</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Instructions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-list-ol me-2"></i>Instructions
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recipe.instructions %}
+                    <div class="recipe-instructions">
+                        {{ recipe.instructions|linebreaks }}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center my-3">No instructions provided</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rating and Review Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-star me-2"></i>Rate This Recipe
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Your Rating</h6>
+                        {% if user_rating %}
+                            <p class="mb-2">
+                                Current rating: 
+                                <span class="rating-stars">
+                                    {% for i in "12345" %}
+                                        {% if forloop.counter <= user_rating.rating %}
+                                            <i class="bi bi-star-fill"></i>
+                                        {% else %}
+                                            <i class="bi bi-star"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                </span>
+                                ({{ user_rating.rating }}/5)
+                            </p>
+                        {% endif %}
+                        
+                        <form method="post" action="{% url 'core:rate_recipe' recipe.id %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="rating" class="form-label">Rating</label>
+                                <select class="form-select" id="rating" name="rating" required>
+                                    <option value="">Select rating</option>
+                                    <option value="1" {% if user_rating.rating == 1 %}selected{% endif %}>1 - Poor</option>
+                                    <option value="2" {% if user_rating.rating == 2 %}selected{% endif %}>2 - Fair</option>
+                                    <option value="3" {% if user_rating.rating == 3 %}selected{% endif %}>3 - Good</option>
+                                    <option value="4" {% if user_rating.rating == 4 %}selected{% endif %}>4 - Very Good</option>
+                                    <option value="5" {% if user_rating.rating == 5 %}selected{% endif %}>5 - Excellent</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="review" class="form-label">Review (optional)</label>
+                                <textarea class="form-control" id="review" name="review" rows="3" 
+                                          placeholder="Share your thoughts about this recipe...">{{ user_rating.review|default:'' }}</textarea>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                {% if user_rating %}Update Rating{% else %}Submit Rating{% endif %}
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h6>Recipe Statistics</h6>
+                        <div class="mb-3">
+                            <strong>Average Rating:</strong> 
+                            <span class="rating-stars">
+                                {% for i in "12345" %}
+                                    {% if forloop.counter <= avg_rating %}
+                                        <i class="bi bi-star-fill"></i>
+                                    {% else %}
+                                        <i class="bi bi-star"></i>
+                                    {% endif %}
+                                {% endfor %}
+                            </span>
+                            <span class="ms-2">{{ avg_rating }}/5</span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <strong>Total Ratings:</strong> 
+                            <span class="badge bg-primary">{{ recipe.ratings.count }}</span>
+                        </div>
+                        
+                        {% if recipe.ratings.exists %}
+                            <h6>Recent Reviews</h6>
+                            <div class="list-group list-group-flush">
+                                {% for rating in recipe.ratings.all|slice:":3" %}
+                                    <div class="list-group-item border-0 px-0">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong>{{ rating.user.username }}</strong>
+                                                <span class="rating-stars ms-2">
+                                                    {% for i in "12345" %}
+                                                        {% if forloop.counter <= rating.rating %}
+                                                            <i class="bi bi-star-fill"></i>
+                                                        {% else %}
+                                                            <i class="bi bi-star"></i>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">{{ rating.created_at|date:"M j" }}</small>
+                                        </div>
+                                        {% if rating.review %}
+                                            <p class="mb-0 mt-1">{{ rating.review|truncatewords:20 }}</p>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning me-2"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:menu_planning' %}" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-calendar-plus me-2"></i>Add to Menu
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:shopping_lists' %}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-cart-plus me-2"></i>Add to Shopping List
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:pantry' %}" class="btn btn-outline-warning w-100">
+                            <i class="bi bi-box-seam me-2"></i>Check Pantry
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:recipe_list' %}" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-arrow-left me-2"></i>Back to Recipes
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .recipe-instructions {
+        line-height: 1.8;
+        font-size: 1.1rem;
+    }
+    
+    .rating-stars {
+        font-size: 1.2rem;
+    }
+    
+    .favorite-btn {
+        font-size: 1.5rem;
+        padding: 0.5rem;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+    }
+    
+    .favorite-btn:hover {
+        transform: scale(1.1);
+    }
+</style>
+{% endblock %}

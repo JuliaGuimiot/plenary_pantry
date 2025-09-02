@@ -77,9 +77,9 @@ class ExtractedRecipe(models.Model):
 class IngredientMapping(models.Model):
     """Map raw ingredient text to normalized ingredients"""
     raw_text = models.CharField(max_length=500)
-    normalized_ingredient = models.ForeignKey('plenary_pantry.Ingredient', on_delete=models.CASCADE, null=True, blank=True)
+    normalized_ingredient = models.ForeignKey('core.Ingredient', on_delete=models.CASCADE, null=True, blank=True)
     quantity = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
-    unit = models.ForeignKey('plenary_pantry.Unit', on_delete=models.CASCADE, null=True, blank=True)
+    unit = models.ForeignKey('core.Unit', on_delete=models.CASCADE, null=True, blank=True)
     preparation_method = models.CharField(max_length=200, blank=True)
     confidence = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)

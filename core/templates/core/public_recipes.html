@@ -1,0 +1,324 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Discover Recipes - Plenary Pantry{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="display-6 fw-bold text-primary mb-2">
+                    <i class="bi bi-globe me-2"></i>Discover Recipes
+                </h1>
+                <p class="lead text-muted">Explore recipes shared by the Plenary Pantry community.</p>
+            </div>
+            <a href="{% url 'core:recipe_list' %}" class="btn btn-outline-primary btn-lg">
+                <i class="bi bi-journal-text me-2"></i>My Recipes
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <!-- Search -->
+                    <div class="col-md-6">
+                        <label for="q" class="form-label">Search Recipes</label>
+                        <input type="text" class="form-control" id="q" name="q" 
+                               value="{{ search_query }}" placeholder="Search by name or description...">
+                    </div>
+                    
+                    <!-- Cuisine Filter -->
+                    <div class="col-md-3">
+                        <label for="cuisine" class="form-label">Cuisine</label>
+                        <select class="form-select" id="cuisine" name="cuisine">
+                            <option value="">All Cuisines</option>
+                            {% for cui in cuisines %}
+                                <option value="{{ cui.name }}" {% if cuisine == cui.name %}selected{% endif %}>
+                                    {{ cui.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Difficulty Filter -->
+                    <div class="col-md-3">
+                        <label for="difficulty" class="form-label">Difficulty</label>
+                        <select class="form-select" id="difficulty" name="difficulty">
+                            <option value="">All Difficulties</option>
+                            {% for diff in difficulties %}
+                                <option value="{{ diff.name }}" {% if difficulty == diff.name %}selected{% endif %}>
+                                    {{ diff.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Filter Buttons -->
+                    <div class="col-12">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-2"></i>Apply Filters
+                            </button>
+                            <a href="{% url 'core:public_recipes' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Clear Filters
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Summary -->
+{% if search_query or cuisine or difficulty %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            Showing filtered results
+            {% if search_query %}for "{{ search_query }}"{% endif %}
+            {% if cuisine %}• Cuisine: {{ cuisine }}{% endif %}
+            {% if difficulty %}• Difficulty: {{ difficulty }}{% endif %}
+            <span class="badge bg-primary ms-2">{{ page_obj.paginator.count }} recipes</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Recipe Grid -->
+{% if page_obj %}
+    <div class="row">
+        {% for recipe in page_obj %}
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="card recipe-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title mb-0">
+                                <a href="{% url 'core:recipe_detail' recipe.id %}" class="text-decoration-none">
+                                    {{ recipe.name }}
+                                </a>
+                            </h5>
+                            <span class="badge bg-success">Public</span>
+                        </div>
+                        
+                        {% if recipe.description %}
+                            <p class="card-text text-muted">{{ recipe.description|truncatewords:20 }}</p>
+                        {% endif %}
+                        
+                        <div class="row text-center mb-3">
+                            <div class="col-4">
+                                <small class="text-muted d-block">Prep</small>
+                                <span class="fw-bold">{{ recipe.prep_time }}m</span>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block">Cook</small>
+                                <span class="fw-bold">{{ recipe.cook_time }}m</span>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block">Servings</small>
+                                <span class="fw-bold">{{ recipe.servings }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {% if recipe.difficulty %}
+                                <span class="badge bg-secondary me-1">{{ recipe.difficulty.name }}</span>
+                            {% endif %}
+                            {% if recipe.cuisine %}
+                                <span class="badge bg-info me-1">{{ recipe.cuisine.name }}</span>
+                            {% endif %}
+                            {% if recipe.course %}
+                                <span class="badge bg-success me-1">{{ recipe.course.name }}</span>
+                            {% endif %}
+                            {% if recipe.diet %}
+                                <span class="badge bg-warning text-dark me-1">{{ recipe.diet.name }}</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-person me-1"></i>
+                                {{ recipe.created_by.username }}
+                            </small>
+                            <a href="{% url 'core:recipe_detail' recipe.id %}" class="btn btn-sm btn-outline-primary">
+                                View Recipe
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="Public recipe pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}">
+                                    <i class="bi bi-chevron-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}">
+                                        {{ num }}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&q={{ search_query }}{% endif %}{% if cuisine %}&cuisine={{ cuisine }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                
+                <div class="text-center text-muted">
+                    <small>
+                        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} recipes
+                    </small>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+{% else %}
+    <!-- No Results -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-globe display-1 text-muted mb-3"></i>
+                    <h4 class="text-muted">No public recipes found</h4>
+                    <p class="text-muted mb-4">
+                        {% if search_query or cuisine or difficulty %}
+                            Try adjusting your search criteria or filters.
+                        {% else %}
+                            No public recipes have been shared yet.
+                        {% endif %}
+                    </p>
+                    <a href="{% url 'core:recipe_list' %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-journal-text me-2"></i>View My Recipes
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Community Info -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-people me-2"></i>About Public Recipes
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>How It Works</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Browse recipes shared by the community</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Filter by cuisine, difficulty, and more</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>View detailed instructions and ingredients</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Rate and review recipes you try</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Share Your Recipes</h6>
+                        <p class="text-muted">Want to share your favorite recipes with the community? Make sure to mark them as public when creating or editing.</p>
+                        <a href="{% url 'ingestion_dashboard' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-plus-circle me-2"></i>Add Recipe
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning me-2"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:recipe_list' %}" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-journal-text me-2"></i>My Recipes
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'ingestion_dashboard' %}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-plus-circle me-2"></i>Add Recipe
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:menu_planning' %}" class="btn btn-outline-warning w-100">
+                            <i class="bi bi-calendar-week me-2"></i>Plan Menu
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'core:shopping_lists' %}" class="btn btn-outline-info w-100">
+                            <i class="bi bi-cart-check me-2"></i>Shopping Lists
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-submit form when filters change
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterSelects = document.querySelectorAll('select[name]');
+        filterSelects.forEach(select => {
+            select.addEventListener('change', function() {
+                this.closest('form').submit();
+            });
+        });
+    });
+</script>
+{% endblock %}
