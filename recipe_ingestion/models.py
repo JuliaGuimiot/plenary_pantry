@@ -219,3 +219,79 @@ class EmailAttachment(models.Model):
     
     def __str__(self):
         return f"{self.filename} ({self.content_type})"
+
+
+class PairedPhotoSource(models.Model):
+    """Track paired photo uploads for ingredients and directions"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('ingredients_uploaded', 'Ingredients Uploaded'),
+        ('directions_uploaded', 'Directions Uploaded'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='paired_photo_sources')
+    pairing_token = models.CharField(max_length=100, unique=True, help_text="Token to link ingredients and directions photos")
+    recipe_name = models.CharField(max_length=200, blank=True, help_text="Recipe name if provided")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    ingredients_photo = models.FileField(
+        upload_to='recipe_sources/paired/ingredients/',
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'heic', 'heif'])]
+    )
+    directions_photo = models.FileField(
+        upload_to='recipe_sources/paired/directions/',
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'heic', 'heif'])]
+    )
+    ingredients_text = models.TextField(blank=True, help_text="Extracted text from ingredients photo")
+    directions_text = models.TextField(blank=True, help_text="Extracted text from directions photo")
+    combined_text = models.TextField(blank=True, help_text="Combined text from both photos")
+    is_test = models.BooleanField(default=False, help_text="Mark as test data for easy filtering")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = "Paired Photo Source"
+        verbose_name_plural = "Paired Photo Sources"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        test_marker = " [TEST]" if self.is_test else ""
+        return f"Paired Photos: {self.recipe_name or 'Untitled'}{test_marker} ({self.status})"
+    
+    def is_complete(self):
+        """Check if both photos are uploaded"""
+        return bool(self.ingredients_photo and self.directions_photo)
+    
+    def can_process(self):
+        """Check if ready for processing"""
+        return self.is_complete() and self.status in ['ingredients_uploaded', 'directions_uploaded']
+
+
+class PairedPhotoJob(models.Model):
+    """Track processing of paired photo sources"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    paired_source = models.ForeignKey(PairedPhotoSource, on_delete=models.CASCADE, related_name='jobs')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    recipes_found = models.PositiveIntegerField(default=0)
+    recipes_processed = models.PositiveIntegerField(default=0)
+    
+    def __str__(self):
+        return f"Paired Job {self.id} - {self.status}"

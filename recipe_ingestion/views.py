@@ -14,9 +14,10 @@ from decimal import Decimal
 
 from .models import (
     IngestionSource, IngestionJob, ExtractedRecipe, 
-    IngredientMapping, ProcessingLog
+    IngredientMapping, ProcessingLog, PairedPhotoSource, PairedPhotoJob
 )
 from .services import RecipeIngestionService
+from .utils import ImageFileValidator, APIResponse, ErrorResponse, SuccessResponse
 from core.models import Recipe
 
 logger = logging.getLogger(__name__)
@@ -66,10 +67,10 @@ def upload_image(request):
                 messages.error(request, 'Please select an image file.')
                 return redirect('ingestion_dashboard')
             
-            # Validate file type
-            allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
-            if uploaded_file.content_type not in allowed_types:
-                messages.error(request, 'Please upload a valid image file (JPEG, PNG, GIF).')
+            # Validate file
+            validation_error = ImageFileValidator.validate_image_file(uploaded_file)
+            if validation_error:
+                messages.error(request, validation_error)
                 return redirect('ingestion_dashboard')
             
             # Create ingestion source
@@ -338,9 +339,7 @@ def api_process_source(request):
         auto_normalize = data.get('auto_normalize', True)  # Default to True
         
         if not source_type or not user_id:
-            return JsonResponse({
-                'error': 'Missing required fields: source_type, user_id'
-            }, status=400)
+            return ErrorResponse.missing_field('source_type' if not source_type else 'user_id')
         
         # Create source based on type
         if source_type == 'url':
@@ -358,13 +357,9 @@ def api_process_source(request):
                 raw_text=data.get('raw_text')
             )
         elif source_type == 'image':
-            return JsonResponse({
-                'error': 'Use multipart/form-data for image uploads'
-            }, status=400)
+            return ErrorResponse.invalid_value('source_type', source_type)
         else:
-            return JsonResponse({
-                'error': f'Unsupported source type: {source_type}'
-            }, status=400)
+            return ErrorResponse.invalid_value('source_type', source_type)
         
         # Process the source
         service = RecipeIngestionService(source.user)
@@ -378,20 +373,15 @@ def api_process_source(request):
             except Exception as e:
                 logger.error(f"Auto-normalization failed: {str(e)}")
         
-        return JsonResponse({
-            'success': True,
-            'job_id': str(job.id),
-            'status': job.status,
-            'recipes_found': job.extracted_recipes.count(),
-            'recipes_saved': len(saved_recipes),
-            'auto_normalized': auto_normalize
-        })
+        return SuccessResponse.processing_success(
+            job_id=str(job.id),
+            recipes_found=job.extracted_recipes.count(),
+            recipes_saved=len(saved_recipes)
+        )
         
     except Exception as e:
         logger.error(f"API processing failed: {str(e)}")
-        return JsonResponse({
-            'error': str(e)
-        }, status=500)
+        return ErrorResponse.processing_error(str(e))
 
 
 def _handle_multipart_upload(request):
@@ -403,9 +393,7 @@ def _handle_multipart_upload(request):
         upload_type = request.POST.get('upload_type', 'single')  # 'single' or 'multi'
         
         if not user_id:
-            return JsonResponse({
-                'error': 'Missing required field: user_id'
-            }, status=400)
+            return ErrorResponse.missing_field('user_id')
         
         # Handle multi-image upload
         if upload_type == 'multi':
@@ -413,24 +401,14 @@ def _handle_multipart_upload(request):
         
         # Handle single image upload
         if 'image' not in request.FILES:
-            return JsonResponse({
-                'error': 'No image file provided'
-            }, status=400)
+            return ErrorResponse.file_validation_error('No image file provided')
         
         image_file = request.FILES['image']
         
-        # Validate file type
-        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif']
-        if image_file.content_type not in allowed_types:
-            return JsonResponse({
-                'error': f'Unsupported file type: {image_file.content_type}. Supported: {", ".join(allowed_types)}'
-            }, status=400)
-        
-        # Validate file size (max 10MB)
-        if image_file.size > 10 * 1024 * 1024:
-            return JsonResponse({
-                'error': 'File too large. Maximum size: 10MB'
-            }, status=400)
+        # Validate file
+        validation_error = ImageFileValidator.validate_image_file(image_file)
+        if validation_error:
+            return ErrorResponse.file_validation_error(validation_error)
         
         # Create source with image file
         source = IngestionSource.objects.create(
@@ -452,22 +430,14 @@ def _handle_multipart_upload(request):
             except Exception as e:
                 logger.error(f"Auto-normalization failed: {str(e)}")
         
-        return JsonResponse({
-            'success': True,
-            'job_id': str(job.id),
-            'status': job.status,
-            'recipes_found': job.extracted_recipes.count(),
-            'recipes_saved': len(saved_recipes),
-            'auto_normalized': auto_normalize,
-            'file_name': image_file.name,
-            'file_size': image_file.size
-        })
+        return SuccessResponse.upload_success(
+            file_name=image_file.name,
+            file_size=image_file.size
+        )
         
     except Exception as e:
         logger.error(f"Multipart upload processing failed: {str(e)}")
-        return JsonResponse({
-            'error': str(e)
-        }, status=500)
+        return ErrorResponse.upload_error(str(e))
 
 
 def _handle_multi_image_upload(request, user_id, auto_normalize, source_name):
@@ -477,38 +447,12 @@ def _handle_multi_image_upload(request, user_id, auto_normalize, source_name):
         image_files = request.FILES.getlist('images')
         
         if not image_files:
-            return JsonResponse({
-                'error': 'No image files provided'
-            }, status=400)
+            return ErrorResponse.file_validation_error('No image files provided')
         
-        # Validate number of images (max 10 pages)
-        if len(image_files) > 10:
-            return JsonResponse({
-                'error': 'Too many images. Maximum: 10 pages'
-            }, status=400)
-        
-        # Validate each file
-        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif']
-        total_size = 0
-        
-        for i, image_file in enumerate(image_files):
-            if image_file.content_type not in allowed_types:
-                return JsonResponse({
-                    'error': f'Unsupported file type in image {i+1}: {image_file.content_type}'
-                }, status=400)
-            
-            if image_file.size > 10 * 1024 * 1024:
-                return JsonResponse({
-                    'error': f'Image {i+1} too large. Maximum size: 10MB'
-                }, status=400)
-            
-            total_size += image_file.size
-        
-        # Check total size (max 50MB for multi-image)
-        if total_size > 50 * 1024 * 1024:
-            return JsonResponse({
-                'error': 'Total file size too large. Maximum: 50MB'
-            }, status=400)
+        # Validate all image files
+        validation_error = ImageFileValidator.validate_image_files(image_files)
+        if validation_error:
+            return ErrorResponse.file_validation_error(validation_error)
         
         # Create multi-image source
         source = IngestionSource.objects.create(
@@ -542,22 +486,15 @@ def _handle_multi_image_upload(request, user_id, auto_normalize, source_name):
             except Exception as e:
                 logger.error(f"Auto-normalization failed: {str(e)}")
         
-        return JsonResponse({
-            'success': True,
-            'job_id': str(job.id),
-            'status': job.status,
-            'recipes_found': job.extracted_recipes.count(),
-            'recipes_saved': len(saved_recipes),
-            'auto_normalized': auto_normalize,
-            'images_count': len(image_files),
-            'total_size': total_size
-        })
+        return SuccessResponse.processing_success(
+            job_id=str(job.id),
+            recipes_found=job.extracted_recipes.count(),
+            recipes_saved=len(saved_recipes)
+        )
         
     except Exception as e:
         logger.error(f"Multi-image upload processing failed: {str(e)}")
-        return JsonResponse({
-            'error': str(e)
-        }, status=500)
+        return ErrorResponse.upload_error(str(e))
 
 
 @login_required
@@ -586,6 +523,12 @@ def api_job_status(request, job_id):
 def mobile_upload(request):
     """Mobile-friendly recipe photo upload interface"""
     return render(request, 'recipe_ingestion/mobile_upload.html')
+
+
+@login_required
+def paired_photo_upload(request):
+    """Paired photo upload interface for ingredients and directions"""
+    return render(request, 'recipe_ingestion/paired_photo_upload.html')
 
 
 @login_required
@@ -690,3 +633,215 @@ def email_ingestion_history(request):
     }
     
     return render(request, 'recipe_ingestion/email_history.html', context)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_create_pairing_token(request):
+    """API endpoint to create a new pairing token for paired photo uploads"""
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        recipe_name = data.get('recipe_name', '')
+        
+        if not user_id:
+            return ErrorResponse.missing_field('user_id')
+        
+        # Generate a unique pairing token
+        import uuid
+        pairing_token = str(uuid.uuid4())[:8]  # Short token for easy sharing
+        
+        # Create paired photo source
+        paired_source = PairedPhotoSource.objects.create(
+            user_id=user_id,
+            pairing_token=pairing_token,
+            recipe_name=recipe_name
+        )
+        
+        return APIResponse.success({
+            'pairing_token': pairing_token,
+            'paired_source_id': str(paired_source.id),
+            'status': paired_source.status
+        })
+        
+    except Exception as e:
+        logger.error(f"Pairing token creation failed: {str(e)}")
+        return ErrorResponse.processing_error(str(e))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_upload_paired_photo(request):
+    """API endpoint to upload ingredients or directions photo for paired uploads"""
+    try:
+        # Get form data
+        pairing_token = request.POST.get('pairing_token')
+        photo_type = request.POST.get('photo_type')  # 'ingredients' or 'directions'
+        user_id = request.POST.get('user_id')
+        
+        if not pairing_token or not photo_type or not user_id:
+            missing_field = 'pairing_token' if not pairing_token else 'photo_type' if not photo_type else 'user_id'
+            return ErrorResponse.missing_field(missing_field)
+        
+        if photo_type not in ['ingredients', 'directions']:
+            return ErrorResponse.invalid_value('photo_type', photo_type)
+        
+        # Find the paired source
+        try:
+            paired_source = PairedPhotoSource.objects.get(
+                pairing_token=pairing_token,
+                user_id=user_id
+            )
+        except PairedPhotoSource.DoesNotExist:
+            return APIResponse.not_found('Paired photo source', pairing_token)
+        
+        # Check if photo already uploaded
+        if photo_type == 'ingredients' and paired_source.ingredients_photo:
+            return ErrorResponse.invalid_value('photo_type', 'ingredients (already uploaded)')
+        
+        if photo_type == 'directions' and paired_source.directions_photo:
+            return ErrorResponse.invalid_value('photo_type', 'directions (already uploaded)')
+        
+        # Get uploaded file
+        photo_file = request.FILES.get('photo')
+        if not photo_file:
+            return ErrorResponse.file_validation_error('No photo file provided')
+        
+        # Validate file
+        validation_error = ImageFileValidator.validate_image_file(photo_file)
+        if validation_error:
+            return ErrorResponse.file_validation_error(validation_error)
+        
+        # Save the photo
+        if photo_type == 'ingredients':
+            paired_source.ingredients_photo = photo_file
+            paired_source.status = 'ingredients_uploaded'
+        else:
+            paired_source.directions_photo = photo_file
+            paired_source.status = 'directions_uploaded'
+        
+        paired_source.save()
+        
+        # Check if both photos are uploaded and process
+        if paired_source.is_complete():
+            # Process the paired photos
+            service = RecipeIngestionService(paired_source.user)
+            job = service.process_paired_photos(paired_source)
+            
+            return SuccessResponse.paired_photo_upload_success(
+                photo_type=photo_type,
+                is_complete=True,
+                job_id=str(job.id)
+            )
+        else:
+            return SuccessResponse.paired_photo_upload_success(
+                photo_type=photo_type,
+                is_complete=False
+            )
+        
+    except Exception as e:
+        logger.error(f"Paired photo upload failed: {str(e)}")
+        return ErrorResponse.upload_error(str(e))
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_get_paired_status(request, pairing_token):
+    """API endpoint to get status of paired photo uploads"""
+    try:
+        user_id = request.GET.get('user_id')
+        if not user_id:
+            return JsonResponse({
+                'error': 'Missing required parameter: user_id'
+            }, status=400)
+        
+        try:
+            paired_source = PairedPhotoSource.objects.get(
+                pairing_token=pairing_token,
+                user_id=user_id
+            )
+        except PairedPhotoSource.DoesNotExist:
+            return JsonResponse({
+                'error': 'Invalid pairing token or user'
+            }, status=404)
+        
+        # Get latest job if exists
+        latest_job = paired_source.jobs.order_by('-started_at').first()
+        
+        return JsonResponse({
+            'success': True,
+            'pairing_token': pairing_token,
+            'recipe_name': paired_source.recipe_name,
+            'status': paired_source.status,
+            'is_complete': paired_source.is_complete(),
+            'ingredients_uploaded': bool(paired_source.ingredients_photo),
+            'directions_uploaded': bool(paired_source.directions_photo),
+            'created_at': paired_source.created_at.isoformat(),
+            'updated_at': paired_source.updated_at.isoformat(),
+            'job': {
+                'id': str(latest_job.id) if latest_job else None,
+                'status': latest_job.status if latest_job else None,
+                'recipes_found': latest_job.recipes_found if latest_job else 0,
+                'recipes_processed': latest_job.recipes_processed if latest_job else 0,
+                'started_at': latest_job.started_at.isoformat() if latest_job and latest_job.started_at else None,
+                'completed_at': latest_job.completed_at.isoformat() if latest_job and latest_job.completed_at else None,
+                'error_message': latest_job.error_message if latest_job else None
+            } if latest_job else None
+        })
+        
+    except Exception as e:
+        logger.error(f"Paired status check failed: {str(e)}")
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_process_paired_photos(request, pairing_token):
+    """API endpoint to manually trigger processing of paired photos"""
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return JsonResponse({
+                'error': 'Missing required field: user_id'
+            }, status=400)
+        
+        try:
+            paired_source = PairedPhotoSource.objects.get(
+                pairing_token=pairing_token,
+                user_id=user_id
+            )
+        except PairedPhotoSource.DoesNotExist:
+            return JsonResponse({
+                'error': 'Invalid pairing token or user'
+            }, status=404)
+        
+        if not paired_source.is_complete():
+            return JsonResponse({
+                'error': 'Both ingredients and directions photos must be uploaded before processing'
+            }, status=400)
+        
+        if paired_source.status == 'processing':
+            return JsonResponse({
+                'error': 'Photos are already being processed'
+            }, status=400)
+        
+        # Process the paired photos
+        service = RecipeIngestionService(paired_source.user)
+        job = service.process_paired_photos(paired_source)
+        
+        return JsonResponse({
+            'success': True,
+            'job_id': str(job.id),
+            'status': job.status,
+            'recipes_found': job.recipes_found
+        })
+        
+    except Exception as e:
+        logger.error(f"Paired photo processing failed: {str(e)}")
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)

@@ -8,6 +8,11 @@ A Django web application for managing pantry inventory and meal planning.
 - PostgreSQL database
 - UV package manager for dependency management
 - Environment-based configuration
+- **Recipe Ingestion System** with multiple input methods:
+  - Image upload with OCR processing
+  - Web URL scraping
+  - Manual text input
+  - **Email-based recipe ingestion** (NEW!)
 
 ## Prerequisites
 
@@ -72,6 +77,31 @@ DB_PORT=5432
 - **Create migrations**: `uv run python manage.py makemigrations`
 - **Apply migrations**: `uv run python manage.py migrate`
 - **Collect static files**: `uv run python manage.py collectstatic`
+
+## Email Recipe Ingestion
+
+The system supports email-based recipe ingestion, allowing users to send recipe photos via email for automatic processing.
+
+### Quick Setup
+
+1. **Configure email settings** in your `.env` file:
+   ```env
+   EMAIL_INGESTION_EMAIL=your-recipe-email@domain.com
+   EMAIL_INGESTION_PASSWORD=your-app-password
+   ```
+
+2. **Add approved email senders**:
+   ```bash
+   uv run python manage.py manage_approved_senders --add "friend@example.com"
+   ```
+
+3. **Start email polling**:
+   ```bash
+   uv run python manage.py poll_emails --once  # Test once
+   uv run python manage.py poll_emails         # Run continuously
+   ```
+
+For detailed setup instructions, see [EMAIL_INGESTION_GUIDE.md](EMAIL_INGESTION_GUIDE.md).
 
 ## Project Structure
 

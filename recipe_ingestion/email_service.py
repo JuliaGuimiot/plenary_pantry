@@ -14,7 +14,7 @@ from django.db import transaction
 
 from .models import (
     IngestionSource, IngestionJob, EmailIngestionSource, 
-    EmailAttachment, ApprovedEmailSender
+    EmailAttachment, ApprovedEmailSender, PairedPhotoSource, PairedPhotoJob
 )
 from .services import RecipeIngestionService
 
@@ -243,6 +243,16 @@ class EmailIngestionService:
             attachments = self._extract_attachments(email_message)
             if not attachments:
                 logger.info(f"No attachments found in email from {sender_email}")
+                return result
+            
+            # Check if we should process as paired photos (2+ image attachments)
+            image_attachments = [att for att in attachments if self._is_image_attachment_data(att)]
+            if len(image_attachments) >= 2:
+                logger.info(f"Found {len(image_attachments)} image attachments, processing as paired photos")
+                paired_result = self.process_paired_photos_from_email(email_source, image_attachments)
+                result['paired_sources_created'] = paired_result['paired_sources_created']
+                result['recipes_created'] = paired_result['recipes_created']
+                result['errors'] = paired_result['errors']
                 return result
             
             # Create ingestion source
@@ -595,3 +605,107 @@ class EmailIngestionService:
                 text_content = payload.decode('utf-8', errors='ignore')
         
         return text_content
+    
+    def process_paired_photos_from_email(self, email_source: EmailIngestionSource, attachments: List[Dict]) -> Dict[str, int]:
+        """Process paired photos from email attachments"""
+        result = {
+            'paired_sources_created': 0,
+            'recipes_created': 0,
+            'errors': 0
+        }
+        
+        try:
+            # Group attachments by potential pairing (based on filename patterns or order)
+            paired_groups = self._group_attachments_for_pairing(attachments)
+            
+            for group in paired_groups:
+                try:
+                    # Create paired photo source
+                    paired_source = self._create_paired_source_from_email(email_source, group)
+                    if not paired_source:
+                        continue
+                    
+                    result['paired_sources_created'] += 1
+                    
+                    # Process the paired photos
+                    service = RecipeIngestionService(self.default_user)
+                    job = service.process_paired_photos(paired_source)
+                    
+                    if job.recipes_found > 0:
+                        result['recipes_created'] += job.recipes_found
+                        logger.info(f"✅ Created {job.recipes_found} recipes from paired photos")
+                    else:
+                        logger.warning(f"⚠️  No recipes extracted from paired photos")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error processing paired photo group: {str(e)}")
+                    result['errors'] += 1
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"💥 Error in paired photo processing: {str(e)}")
+            result['errors'] += 1
+        
+        return result
+    
+    def _group_attachments_for_pairing(self, attachments: List[Dict]) -> List[List[Dict]]:
+        """Group attachments into potential pairs for ingredients/directions"""
+        groups = []
+        
+        # Simple grouping: pair consecutive image attachments
+        image_attachments = [att for att in attachments if self._is_image_attachment_data(att)]
+        
+        # Group in pairs
+        for i in range(0, len(image_attachments), 2):
+            if i + 1 < len(image_attachments):
+                groups.append([image_attachments[i], image_attachments[i + 1]])
+            else:
+                # Single remaining image - create a group with just one
+                groups.append([image_attachments[i]])
+        
+        return groups
+    
+    def _is_image_attachment_data(self, attachment_data: Dict) -> bool:
+        """Check if attachment data represents an image"""
+        image_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/heic', 'image/heif']
+        return attachment_data.get('content_type', '').lower() in image_types
+    
+    def _create_paired_source_from_email(self, email_source: EmailIngestionSource, attachment_group: List[Dict]) -> Optional[PairedPhotoSource]:
+        """Create a paired photo source from email attachments"""
+        try:
+            if len(attachment_group) < 1:
+                return None
+            
+            # Generate pairing token
+            import uuid
+            pairing_token = str(uuid.uuid4())[:8]
+            
+            # Create paired source
+            paired_source = PairedPhotoSource.objects.create(
+                user=self.default_user,
+                pairing_token=pairing_token,
+                recipe_name=f"Email Recipe from {email_source.sender_name or email_source.sender_email}",
+                is_test=False
+            )
+            
+            # Assign first attachment as ingredients, second as directions
+            if len(attachment_group) >= 1:
+                ingredients_data = attachment_group[0]
+                ingredients_file = ContentFile(ingredients_data['data'], name=ingredients_data['filename'])
+                paired_source.ingredients_photo = ingredients_file
+                paired_source.status = 'ingredients_uploaded'
+            
+            if len(attachment_group) >= 2:
+                directions_data = attachment_group[1]
+                directions_file = ContentFile(directions_data['data'], name=directions_data['filename'])
+                paired_source.directions_photo = directions_file
+                paired_source.status = 'directions_uploaded'
+            
+            paired_source.save()
+            
+            logger.info(f"✅ Created paired photo source: {pairing_token}")
+            return paired_source
+            
+        except Exception as e:
+            logger.error(f"❌ Error creating paired source from email: {str(e)}")
+            return None

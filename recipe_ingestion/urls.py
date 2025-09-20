@@ -11,6 +11,7 @@ urlpatterns = [
     # Ingestion methods
     path('upload-image/', views.upload_image, name='upload_image'),
     path('mobile-upload/', views.mobile_upload, name='mobile_upload'),
+    path('paired-upload/', views.paired_photo_upload, name='paired_photo_upload'),
     path('process-url/', views.process_url, name='process_url'),
     path('manual-input/', views.manual_input, name='manual_input'),
     
@@ -30,4 +31,10 @@ urlpatterns = [
     # API endpoints
     path('api/process/', views.api_process_source, name='api_process_source'),
     path('api/job/<uuid:job_id>/status/', views.api_job_status, name='api_job_status'),
+    
+    # Paired photo API endpoints
+    path('api/paired/create-token/', views.api_create_pairing_token, name='api_create_pairing_token'),
+    path('api/paired/upload/', views.api_upload_paired_photo, name='api_upload_paired_photo'),
+    path('api/paired/<str:pairing_token>/status/', views.api_get_paired_status, name='api_get_paired_status'),
+    path('api/paired/<str:pairing_token>/process/', views.api_process_paired_photos, name='api_process_paired_photos'),
 ]

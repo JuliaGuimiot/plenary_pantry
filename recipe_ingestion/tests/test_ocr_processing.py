@@ -24,7 +24,7 @@ import numpy as np
 from recipe_ingestion.services import (
     RecipeIngestionService, 
     IngredientNormalizer, 
-    RecipeParser
+    RecipeParserService
 )
 from recipe_ingestion.models import (
     IngestionSource, 
@@ -192,12 +192,12 @@ class TestIngredientNormalizer(TestCase):
             self.assertEqual(result['preparation_method'], expected['preparation_method'])
 
 
-class TestRecipeParser(TestCase):
-    """Test the RecipeParser class functionality"""
+class TestRecipeParserService(TestCase):
+    """Test the RecipeParserService class functionality"""
     
     def setUp(self):
         """Set up test data"""
-        self.parser = RecipeParser()
+        self.parser = RecipeParserService()
     
     def test_parse_single_recipe_complete(self):
         """Test parsing a complete recipe with all components"""
